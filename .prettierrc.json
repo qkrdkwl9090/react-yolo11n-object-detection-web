@@ -11,5 +11,6 @@
   "jsxSingleQuote": true,
   "arrowParens": "avoid",
   "endOfLine": "lf",
-  "embeddedLanguageFormatting": "auto"
+  "embeddedLanguageFormatting": "auto",
+  "plugins": ["prettier-plugin-tailwindcss"]
 }

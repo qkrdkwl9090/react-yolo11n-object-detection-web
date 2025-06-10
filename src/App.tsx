@@ -1,6 +1,8 @@
+import './index.css';
+
 function App() {
   return (
-      <div>Page
+      <div className="text-red-500">Page
       </div>
   );
 }
