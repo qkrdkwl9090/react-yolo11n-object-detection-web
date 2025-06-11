@@ -1,9 +1,12 @@
+import Layout from '@/components/Layout';
+import CameraContainer from '@/containers/CameraContainer';
 import '@/index.css';
 
 function App() {
   return (
-      <div className="text-red-500">Page
-      </div>
+    <Layout>
+      <CameraContainer />
+    </Layout>
   );
 }
 
