@@ -13,6 +13,7 @@
     "format:staged": "prettier --write --cache --ignore-unknown"
   },
   "dependencies": {
+    "onnxruntime-web": "^1.22.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwind-merge": "^3.3.0"

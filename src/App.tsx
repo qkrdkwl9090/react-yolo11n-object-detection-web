@@ -1,11 +1,11 @@
 import Layout from '@/components/Layout';
-import CameraContainer from '@/containers/CameraContainer';
+import YoloContainer from '@/containers/YoloContainer';
 import '@/index.css';
 
 function App() {
   return (
     <Layout>
-      <CameraContainer />
+      <YoloContainer />
     </Layout>
   );
 }
