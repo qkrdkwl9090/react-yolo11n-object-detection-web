@@ -1,54 +1,51 @@
-# React + TypeScript + Vite
+# 🎯 YOLO11 - 브라우저 기반 실시간 객체 감지
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ONNX Runtime Web 기반 브라우저 실시간 YOLO11 객체 감지 시스템입니다.
+WebGPU 가속과 WASM(CPU) 폴백을 지원하며, 웹캠을 통한 실시간 영상 처리가 가능합니다.
 
-Currently, two official plugins are available:
+![YOLO11 웹 데모](/public/screen.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ 주요 기능
 
-## Expanding the ESLint configuration
+- **실시간 추론** - 웹캠을 통한 실시간 객체 감지
+- **WebGPU 가속** - CPU 대비 최대 10배 빠른 처리 속도
+- **다양한 모델** - 감지, 세그멘테이션, 포즈 추정 지원
+- **설치 불필요** - 브라우저에서 바로 실행
+- **카메라 선택** - 사용 가능한 카메라 자동 인식
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🚀 지원 모델
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+**사용 가능한 YOLO11 모델**
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+| 모델         | 타입         | 입력 크기 | 용량   | 기능                         |
+| ------------ | ------------ | --------- | ------ | ---------------------------- |
+| YOLO11n      | 객체 감지    | 640×640   | 10.7MB | 80가지 객체 클래스 감지      |
+| YOLO11n-seg  | 세그멘테이션 | 640×640   | 11.7MB | 인스턴스 세그멘테이션 마스크 |
+| YOLO11n-pose | 포즈 추정    | 640×640   | 11.8MB | 17개 인체 관절 추정          |
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+**추론 백엔드**
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+- **WebGPU** - GPU 가속 추론 (Chrome 113+ 지원)
+- **WASM** - 멀티스레딩 CPU 폴백
+- **ONNX Runtime Web** - 브라우저 최적화 실행 환경
+
+## 🛠️ 기술 스택
+
+- **React 18** + **TypeScript** + **Vite**
+- **Tailwind CSS**
+- **ONNX Runtime Web**
+- **pnpm**
+
+## ⚡ Setup
+
+```bash
+# clone
+git clone https://github.com/your-username/react-yolo11n-object-detection-web.git
+cd react-yolo11n-object-detection-web
+
+# install dependencies
+pnpm install
+
+# start dev server
+pnpm dev
 ```
