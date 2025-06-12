@@ -1,11 +1,20 @@
 import type { ModelInfo } from '@/types/model';
 
+const getBasePath = (): string => {
+  if (import.meta.env.DEV) {
+    return '';
+  }
+  return import.meta.env.BASE_URL || '/';
+};
+
+const BASE_PATH = getBasePath();
+
 export const YOLO_MODELS: ModelInfo[] = [
   {
     id: 'yolo11n',
     name: 'YOLOv11n Detection',
     description: 'General object detection (80 classes)',
-    file: '/models/yolo11n.onnx',
+    file: `${BASE_PATH}models/yolo11n.onnx`,
     type: 'detection',
     inputShape: [1, 3, 640, 640],
   },
