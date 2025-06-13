@@ -20,7 +20,7 @@ const Layout = ({ children, className }: LayoutProps) => {
       </header>
 
       {/* Main Content */}
-      <main className={cn('mx-auto max-w-[800px] py-4', className)}>
+      <main className={cn('mx-auto max-w-[50rem] py-4', className)}>
         {children}
       </main>
 
