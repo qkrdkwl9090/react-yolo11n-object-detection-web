@@ -17,7 +17,37 @@ export const YOLO_MODELS: ModelInfo[] = [
     file: `${BASE_PATH}models/yolo11n.onnx`,
     type: 'detection',
     inputShape: [1, 3, 640, 640],
+    outputFormat: '[1, 84, 8400]', // 4 bbox + 80 classes
   },
+  {
+    id: 'yolo11n-seg',
+    name: 'YOLOv11n Segmentation',
+    description: 'Instance segmentation with masks',
+    file: `${BASE_PATH}models/yolo11n-seg.onnx`,
+    type: 'segmentation',
+    inputShape: [1, 3, 640, 640],
+    outputFormat: '[1, 116, 8400]', // 4 bbox + 80 classes + 32 mask
+  },
+];
+
+export const POSE_KEYPOINT_NAMES = [
+  'nose',
+  'left_eye',
+  'right_eye',
+  'left_ear',
+  'right_ear',
+  'left_shoulder',
+  'right_shoulder',
+  'left_elbow',
+  'right_elbow',
+  'left_wrist',
+  'right_wrist',
+  'left_hip',
+  'right_hip',
+  'left_knee',
+  'right_knee',
+  'left_ankle',
+  'right_ankle',
 ];
 
 export const COCO_CLASSES = [

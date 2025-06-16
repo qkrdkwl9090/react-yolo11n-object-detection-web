@@ -5,6 +5,7 @@ export interface ModelInfo {
   file: string;
   type: 'detection' | 'segmentation' | 'pose';
   inputShape: [number, number, number, number]; // [batch, channels, height, width]
+  outputFormat: string;
 }
 
 export interface ModelState {
@@ -30,11 +31,11 @@ export interface PoseKeypoint {
 
 export interface PoseDetection extends Detection {
   keypoints: PoseKeypoint[];
+  skeleton: [number, number][];
 }
-
-export interface SegmentationMask {
-  mask: number[][];
-  bbox: [number, number, number, number];
-  confidence: number;
-  classId: number;
+export interface SegmentationResult extends Detection {
+  mask?: ImageData;
+  maskPath?: Path2D;
+  maskCoords?: number[][];
 }
+export type InferenceResult = Detection | SegmentationResult;

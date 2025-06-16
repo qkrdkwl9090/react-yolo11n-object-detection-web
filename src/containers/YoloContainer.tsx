@@ -1,15 +1,15 @@
 import CameraSelector from '@/components/CameraSelector';
-import DetectionOverlay from '@/components/DetectionOverlay';
+import InferenceOverlay from '@/components/InferenceOverlay';
 import ModelSelector from '@/components/ModelSelector';
 import useCamera from '@/hooks/useCamera';
 import useInference from '@/hooks/useInference';
 import useModel from '@/hooks/useModel';
 import { cn } from '@/lib/utils';
-import type { Detection, ModelInfo } from '@/types/model';
+import type { InferenceResult, ModelInfo } from '@/types/model';
 import { useEffect, useRef, useState } from 'react';
 
 const YoloContainer = () => {
-  const [detections, setDetections] = useState<Detection[]>([]);
+  const [results, setResults] = useState<InferenceResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>(0);
@@ -27,12 +27,12 @@ const YoloContainer = () => {
     const runDetection = async () => {
       if (videoRef.current && model.session && model.selectedModel) {
         try {
-          const newDetections = await runInference(
+          const newResults = await runInference(
             model.session,
             videoRef.current,
             model.selectedModel
           );
-          setDetections(newDetections);
+          setResults(newResults);
         } catch (error) {
           console.error('Detection error:', error);
         }
@@ -67,7 +67,7 @@ const YoloContainer = () => {
 
   const handleModelSelect = async (modelInfo: ModelInfo) => {
     setIsRunning(false);
-    setDetections([]);
+    setResults([]);
     await model.loadModel(modelInfo);
   };
 
@@ -100,7 +100,9 @@ const YoloContainer = () => {
       {/* 비디오 스트림 및 감지 결과 */}
       <div className='p-6'>
         <div className='mb-4 flex items-center justify-between'>
-          <h2 className='text-xl font-semibold'>Real-time Detection</h2>
+          <h2 className='text-xl font-semibold'>
+            Real-time {model.selectedModel?.type || 'Detection'}
+          </h2>
           <button
             onClick={toggleDetection}
             disabled={!model.isLoaded || !camera.stream}
@@ -126,10 +128,11 @@ const YoloContainer = () => {
             className='h-full w-full object-cover'
           />
 
-          {/* 감지 결과 오버레이 */}
-          <DetectionOverlay
-            detections={detections}
+          {/* 통합 오버레이 */}
+          <InferenceOverlay
+            results={results}
             videoElement={videoRef.current}
+            modelType={model.selectedModel?.type || 'detection'}
           />
 
           {/* 상태 표시 */}
@@ -147,28 +150,28 @@ const YoloContainer = () => {
 
             {isRunning && (
               <div className='rounded-full border border-blue-500/30 bg-blue-500/20 px-3 py-1 text-sm font-medium text-blue-300'>
-                ● Live Detection ({detections.length} objects)
+                ● Live {model.selectedModel?.type} ({results.length} objects)
               </div>
             )}
           </div>
         </div>
 
-        {/* 감지 통계 */}
-        {detections.length > 0 && (
+        {/* 결과 통계 */}
+        {results.length > 0 && (
           <div className='mt-4 rounded-lg bg-gray-800 p-4'>
             <h3 className='mb-2 text-sm font-medium text-gray-300'>
-              Detected Objects:
+              Detected Objects ({model.selectedModel?.type}):
             </h3>
             <div className='flex flex-wrap gap-2'>
-              {Array.from(new Set(detections.map(d => d.className))).map(
+              {Array.from(new Set(results.map(r => r.className))).map(
                 className => {
-                  const count = detections.filter(
-                    d => d.className === className
+                  const count = results.filter(
+                    r => r.className === className
                   ).length;
                   return (
                     <span
                       key={className}
-                      className='bg-primary-500/20 text-primary-300 rounded px-2 py-1 text-sm'
+                      className='text-primary-300 rounded bg-primary-500/20 px-2 py-1 text-sm'
                     >
                       {className}: {count}
                     </span>
