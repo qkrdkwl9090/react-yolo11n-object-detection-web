@@ -31,9 +31,16 @@ const useModel = () => {
 
       // 기존 세션 정리
       if (sessionRef.current) {
-        sessionRef.current.release();
+        try {
+          await sessionRef.current.release();
+        } catch (error) {
+          console.warn('Error releasing session:', error);
+        }
         sessionRef.current = null;
       }
+
+      // 메모리 정리를 위한 약간의 지연
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // 새 세션 생성
       const session = await ort.InferenceSession.create(model.file, {
@@ -55,6 +62,7 @@ const useModel = () => {
       }));
     } catch (error) {
       console.error('Model loading error:', error);
+      console.error('Failed model path:', model.file);
       setState(prev => ({
         ...prev,
         isLoading: false,

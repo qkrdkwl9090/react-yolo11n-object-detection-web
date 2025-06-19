@@ -32,7 +32,7 @@ export const YOLO_MODELS: ModelInfo[] = [
     id: 'yolo11n-pose',
     name: 'YOLOv11n Pose',
     description: 'Human pose estimation (17 keypoints)',
-    file: '/models/yolo11n-pose.onnx',
+    file: `${BASE_PATH}models/yolo11n-pose.onnx`,
     type: 'pose',
     inputShape: [1, 3, 640, 640],
     outputFormat: '[1, 56, 8400]', // 4 bbox + 1 conf + 17*3 keypoints
