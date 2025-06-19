@@ -3,6 +3,7 @@ import type {
   Detection,
   InferenceResult,
   ModelInfo,
+  PoseResult,
   SegmentationResult,
 } from '@/types/model';
 import * as ort from 'onnxruntime-web';
@@ -18,7 +19,6 @@ const useInference = () => {
     ): { tensor: ort.Tensor; canvas: HTMLCanvasElement } => {
       const [targetWidth, targetHeight] = targetSize;
 
-      // 캔버스 생성 또는 재사용
       if (!canvasRef.current) {
         canvasRef.current = document.createElement('canvas');
       }
@@ -29,23 +29,19 @@ const useInference = () => {
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
-
-      // 비디오를 캔버스에 그리기 (리사이즈)
       ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
 
-      // 이미지 데이터 가져오기
       const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
       const { data } = imageData;
 
-      // RGB 정규화 및 CHW 형식으로 변환
       const float32Data = new Float32Array(3 * targetWidth * targetHeight);
       for (let i = 0; i < data.length; i += 4) {
         const pixelIndex = i / 4;
-        float32Data[pixelIndex] = data[i] / 255.0; // R
+        float32Data[pixelIndex] = data[i] / 255.0;
         float32Data[pixelIndex + targetWidth * targetHeight] =
-          data[i + 1] / 255.0; // G
+          data[i + 1] / 255.0;
         float32Data[pixelIndex + targetWidth * targetHeight * 2] =
-          data[i + 2] / 255.0; // B
+          data[i + 2] / 255.0;
       }
 
       const tensor = new ort.Tensor('float32', float32Data, [
@@ -99,14 +95,6 @@ const useInference = () => {
 
         // 좌표 유효성 확인
         if (width <= 0 || height <= 0) continue;
-        if (
-          x_center < 0 ||
-          y_center < 0 ||
-          x_center > modelWidth ||
-          y_center > modelHeight
-        )
-          continue;
-
         // center 좌표를 corner 좌표로 변환
         const x1 = x_center - width / 2;
         const y1 = y_center - height / 2;
@@ -239,7 +227,94 @@ const useInference = () => {
     },
     []
   );
-  // 세그멘테이션 마스크 생성
+
+  // Pose 후처리 (새로 추가)
+  const postprocessPose = useCallback(
+    (
+      output: ort.Tensor,
+      originalSize: [number, number],
+      modelSize: [number, number] = [640, 640],
+      confidenceThreshold: number = 0.5,
+      iouThreshold: number = 0.4
+    ): PoseResult[] => {
+      const [originalWidth, originalHeight] = originalSize;
+      const [modelWidth, modelHeight] = modelSize;
+
+      const data = output.data as Float32Array;
+      const [batchSize, numFeatures, numDetections] = output.dims;
+
+      console.log('Pose Output dims:', output.dims);
+      console.log(
+        `Processing: batch=${batchSize}, features=${numFeatures}, detections=${numDetections}`
+      );
+
+      const results: PoseResult[] = [];
+
+      // YOLO11-pose 출력: [1, 56, 8400] 형태
+      // 56 = 4(bbox) + 1(person_conf) + 17*3(keypoints: x,y,conf)
+
+      for (let i = 0; i < numDetections; i++) {
+        const x_center = data[0 * numDetections + i];
+        const y_center = data[1 * numDetections + i];
+        const width = data[2 * numDetections + i];
+        const height = data[3 * numDetections + i];
+        const personConf = data[4 * numDetections + i];
+
+        if (personConf < confidenceThreshold) continue;
+        if (width <= 0 || height <= 0) continue;
+
+        // 17개 키포인트 추출 (5번째부터)
+        const keypoints = [];
+        for (let j = 0; j < 17; j++) {
+          const keypointX = data[(5 + j * 3) * numDetections + i];
+          const keypointY = data[(5 + j * 3 + 1) * numDetections + i];
+          const keypointConf = data[(5 + j * 3 + 2) * numDetections + i];
+
+          // 모델 좌표를 원본 이미지 좌표로 변환
+          const scaledX = (keypointX / modelWidth) * originalWidth;
+          const scaledY = (keypointY / modelHeight) * originalHeight;
+
+          keypoints.push({
+            x: scaledX,
+            y: scaledY,
+            confidence: keypointConf,
+            visible: keypointConf > 0.5,
+          });
+        }
+
+        // 바운딩 박스 좌표 변환
+        const x1 = x_center - width / 2;
+        const y1 = y_center - height / 2;
+        const x2 = x_center + width / 2;
+        const y2 = y_center + height / 2;
+
+        const scaledX1 = Math.max(0, (x1 / modelWidth) * originalWidth);
+        const scaledY1 = Math.max(0, (y1 / modelHeight) * originalHeight);
+        const scaledX2 = Math.min(
+          originalWidth,
+          (x2 / modelWidth) * originalWidth
+        );
+        const scaledY2 = Math.min(
+          originalHeight,
+          (y2 / modelHeight) * originalHeight
+        );
+
+        results.push({
+          bbox: [scaledX1, scaledY1, scaledX2, scaledY2],
+          confidence: personConf,
+          classId: 0, // person
+          className: 'person',
+          keypoints,
+        });
+      }
+
+      console.log(`Pose results: ${results.length}`);
+      return applyNMSPose(results, iouThreshold);
+    },
+    []
+  );
+
+  // 마스크 생성 함수
   const generateSegmentationMask = useCallback(
     (
       coeffs: number[],
@@ -396,6 +471,35 @@ const useInference = () => {
     []
   );
 
+  const applyNMSPose = useCallback(
+    (results: PoseResult[], iouThreshold: number): PoseResult[] => {
+      const sortedResults = [...results].sort(
+        (a, b) => b.confidence - a.confidence
+      );
+      const keep: PoseResult[] = [];
+      const suppressed = new Set<number>();
+
+      for (let i = 0; i < sortedResults.length; i++) {
+        if (suppressed.has(i)) continue;
+        keep.push(sortedResults[i]);
+
+        for (let j = i + 1; j < sortedResults.length; j++) {
+          if (suppressed.has(j)) continue;
+          const iou = calculateIoU(
+            sortedResults[i].bbox,
+            sortedResults[j].bbox
+          );
+          if (iou > iouThreshold) {
+            suppressed.add(j);
+          }
+        }
+      }
+
+      return keep;
+    },
+    []
+  );
+
   const calculateIoU = useCallback(
     (bbox1: number[], bbox2: number[]): number => {
       const [x1_1, y1_1, x2_1, y2_1] = bbox1;
@@ -440,19 +544,27 @@ const useInference = () => {
         // 후처리
         let results: InferenceResult[] = [];
 
-        if (model.type === 'segmentation') {
-          // 세그멘테이션 모델
-          results = postprocessSegmentation(outputs, [
-            video.videoWidth,
-            video.videoHeight,
-          ]);
-        } else {
-          // 감지 모델
-          const outputTensor = outputs[session.outputNames[0]];
-          results = postprocessDetections(outputTensor, [
-            video.videoWidth,
-            video.videoHeight,
-          ]);
+        switch (model.type) {
+          case 'segmentation':
+            results = postprocessSegmentation(outputs, [
+              video.videoWidth,
+              video.videoHeight,
+            ]);
+            break;
+          case 'pose':
+            const outputTensor = outputs[session.outputNames[0]];
+            results = postprocessPose(outputTensor, [
+              video.videoWidth,
+              video.videoHeight,
+            ]);
+            break;
+          default: // detection
+            const detectionTensor = outputs[session.outputNames[0]];
+            results = postprocessDetections(detectionTensor, [
+              video.videoWidth,
+              video.videoHeight,
+            ]);
+            break;
         }
 
         // 텐서 메모리 정리
@@ -463,7 +575,12 @@ const useInference = () => {
         return [];
       }
     },
-    [preprocessImage, postprocessDetections, postprocessSegmentation]
+    [
+      preprocessImage,
+      postprocessDetections,
+      postprocessSegmentation,
+      postprocessPose,
+    ]
   );
 
   return { runInference };

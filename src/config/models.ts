@@ -28,8 +28,39 @@ export const YOLO_MODELS: ModelInfo[] = [
     inputShape: [1, 3, 640, 640],
     outputFormat: '[1, 116, 8400]', // 4 bbox + 80 classes + 32 mask
   },
+  {
+    id: 'yolo11n-pose',
+    name: 'YOLOv11n Pose',
+    description: 'Human pose estimation (17 keypoints)',
+    file: '/models/yolo11n-pose.onnx',
+    type: 'pose',
+    inputShape: [1, 3, 640, 640],
+    outputFormat: '[1, 56, 8400]', // 4 bbox + 1 conf + 17*3 keypoints
+  },
 ];
 
+// COCO Pose 스켈레톤 연결 정보
+export const POSE_SKELETON_CONNECTIONS = [
+  [16, 14],
+  [14, 12],
+  [17, 15],
+  [15, 13],
+  [12, 13], // 머리와 어깨
+  [6, 12],
+  [7, 13],
+  [6, 7], // 어깨 연결
+  [6, 8],
+  [7, 9],
+  [8, 10],
+  [9, 11], // 팔
+  [2, 3],
+  [1, 2],
+  [1, 3],
+  [2, 4],
+  [3, 5],
+  [4, 6],
+  [5, 7], // 얼굴과 상체
+];
 export const POSE_KEYPOINT_NAMES = [
   'nose',
   'left_eye',
@@ -48,6 +79,27 @@ export const POSE_KEYPOINT_NAMES = [
   'right_knee',
   'left_ankle',
   'right_ankle',
+];
+
+// 키포인트별 색상 (관절 부위별로 구분)
+export const POSE_COLORS = [
+  '#FF6B6B',
+  '#4ECDC4',
+  '#45B7D1',
+  '#96CEB4',
+  '#FECA57', // 얼굴
+  '#FF9FF3',
+  '#54A0FF',
+  '#5F27CD',
+  '#00D2D3',
+  '#FF9F43', // 상체
+  '#FF6348',
+  '#2ED573',
+  '#3742FA',
+  '#F8B500',
+  '#A4B0BE', // 하체
+  '#2F3542',
+  '#57606F', // 발목
 ];
 
 export const COCO_CLASSES = [

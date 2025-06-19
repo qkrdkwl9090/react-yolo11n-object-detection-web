@@ -27,15 +27,14 @@ export interface PoseKeypoint {
   x: number;
   y: number;
   confidence: number;
+  visible: boolean;
 }
 
-export interface PoseDetection extends Detection {
+export interface PoseResult extends Detection {
   keypoints: PoseKeypoint[];
-  skeleton: [number, number][];
 }
+
 export interface SegmentationResult extends Detection {
   mask?: ImageData;
-  maskPath?: Path2D;
-  maskCoords?: number[][];
 }
-export type InferenceResult = Detection | SegmentationResult;
+export type InferenceResult = Detection | SegmentationResult | PoseResult;
