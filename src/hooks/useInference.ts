@@ -25,7 +25,8 @@ const useInference = () => {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d', {
         willReadFrequently: true,
-      })!;
+      });
+      if (!ctx) throw new Error('Failed to get 2D context');
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
@@ -213,6 +214,8 @@ const useInference = () => {
           [originalWidth, originalHeight]
         );
 
+        if (!mask) continue;
+
         results.push({
           bbox: [scaledX1, scaledY1, scaledX2, scaledY2],
           confidence: maxClassScore,
@@ -322,7 +325,7 @@ const useInference = () => {
       protoDims: [number, number, number], // [channels, height, width]
       bbox: [number, number, number, number],
       originalSize: [number, number]
-    ): ImageData => {
+    ): ImageData | null => {
       const [protoChannels, protoHeight, protoWidth] = protoDims;
       const [originalWidth, originalHeight] = originalSize;
       const [x1, y1, x2, y2] = bbox;
@@ -344,14 +347,16 @@ const useInference = () => {
 
       // 마스크를 원본 크기로 리사이즈
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
 
       canvas.width = originalWidth;
       canvas.height = originalHeight;
 
       // 임시 캔버스에 proto 크기로 마스크 그리기
       const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d')!;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return null;
       tempCanvas.width = protoWidth;
       tempCanvas.height = protoHeight;
 
