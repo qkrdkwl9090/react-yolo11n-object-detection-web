@@ -22,7 +22,7 @@ const YoloContainer = () => {
 
   // 추론 정리
   const cleanupInference = useCallback(() => {
-    console.log('Cleaning up inference...');
+    if (import.meta.env.DEV) console.log('Cleaning up inference...');
     isRunningRef.current = false;
     isProcessingRef.current = false;
     setIsRunning(false);
@@ -42,11 +42,11 @@ const YoloContainer = () => {
       !videoRef.current ||
       !model.selectedModel
     ) {
-      console.log('Cannot start inference: missing requirements');
+      if (import.meta.env.DEV) console.log('Cannot start inference: missing requirements');
       return;
     }
 
-    console.log('Starting inference with model:', model.selectedModel.name);
+    if (import.meta.env.DEV) console.log('Starting inference with model:', model.selectedModel.name);
     isRunningRef.current = true;
     isProcessingRef.current = false;
     setIsRunning(true);
@@ -67,7 +67,7 @@ const YoloContainer = () => {
     const runDetection = async () => {
       // 실행 상태 재확인
       if (!isRunningRef.current) {
-        console.log('Inference stopped, exiting loop');
+        if (import.meta.env.DEV) console.log('Inference stopped, exiting loop');
         return;
       }
 
@@ -141,7 +141,7 @@ const YoloContainer = () => {
 
   // 모델 선택 핸들러 - 완전한 상태 리셋
   const handleModelSelect = async (modelInfo: ModelInfo) => {
-    console.log('Model selection started:', modelInfo.name);
+    if (import.meta.env.DEV) console.log('Model selection started:', modelInfo.name);
 
     // 1. 즉시 추론 정리
     cleanupInference();
@@ -152,7 +152,7 @@ const YoloContainer = () => {
     // 3. 모델 로드
     try {
       await model.loadModel(modelInfo);
-      console.log('Model loaded successfully:', modelInfo.name);
+      if (import.meta.env.DEV) console.log('Model loaded successfully:', modelInfo.name);
     } catch (error) {
       console.error('Model loading failed:', error);
     }
@@ -161,15 +161,15 @@ const YoloContainer = () => {
   // 추론 토글 핸들러
   const toggleDetection = () => {
     if (!model.isLoaded || !camera.stream) {
-      console.log('Cannot toggle: model not loaded or camera not available');
+      if (import.meta.env.DEV) console.log('Cannot toggle: model not loaded or camera not available');
       return;
     }
 
     if (isRunningRef.current) {
-      console.log('Stopping detection');
+      if (import.meta.env.DEV) console.log('Stopping detection');
       cleanupInference();
     } else {
-      console.log('Starting detection');
+      if (import.meta.env.DEV) console.log('Starting detection');
       startInference();
     }
   };
@@ -177,7 +177,7 @@ const YoloContainer = () => {
   // 모델이 변경될 때 추론 정리
   useEffect(() => {
     if (model.selectedModel) {
-      console.log('Model changed, cleaning up previous inference');
+      if (import.meta.env.DEV) console.log('Model changed, cleaning up previous inference');
       cleanupInference();
     }
   }, [model.selectedModel, cleanupInference]);
@@ -185,7 +185,7 @@ const YoloContainer = () => {
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
-      console.log('Component unmounting, cleaning up');
+      if (import.meta.env.DEV) console.log('Component unmounting, cleaning up');
       cleanupInference();
     };
   }, [cleanupInference]);

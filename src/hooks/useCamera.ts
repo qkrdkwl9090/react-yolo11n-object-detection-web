@@ -25,7 +25,7 @@ const useCamera = () => {
         device => device.kind === 'videoinput'
       );
 
-      console.log('Found video devices:', videoDevices); // 디버깅용
+      if (import.meta.env.DEV) console.log('Found video devices:', videoDevices);
 
       // 권한 요청용 스트림 정리
       permissionStream.getTracks().forEach(track => track.stop());
@@ -41,7 +41,7 @@ const useCamera = () => {
         await startCameraInternal(videoDevices[0].deviceId);
       }
     } catch (error) {
-      console.error('Camera access error:', error); // 디버깅용
+      if (import.meta.env.DEV) console.error('Camera access error:', error);
       setState(prev => ({
         ...prev,
         error:
@@ -54,7 +54,7 @@ const useCamera = () => {
   // 내부 카메라 시작 함수
   const startCameraInternal = useCallback(async (deviceId: string) => {
     try {
-      console.log('Starting camera with deviceId:', deviceId); // 디버깅용
+      if (import.meta.env.DEV) console.log('Starting camera with deviceId:', deviceId);
 
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -75,11 +75,11 @@ const useCamera = () => {
         audio: false,
       };
 
-      console.log('Camera constraints:', constraints); // 디버깅용
+      if (import.meta.env.DEV) console.log('Camera constraints:', constraints);
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-      console.log('Camera stream created:', stream); // 디버깅용
+      if (import.meta.env.DEV) console.log('Camera stream created:', stream);
 
       setState(prev => ({
         ...prev,
@@ -88,7 +88,7 @@ const useCamera = () => {
         isLoading: false,
       }));
     } catch (error) {
-      console.error('Start camera error:', error); // 디버깅용
+      if (import.meta.env.DEV) console.error('Start camera error:', error);
       setState(prev => ({
         ...prev,
         error:

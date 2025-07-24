@@ -27,14 +27,14 @@ const useModel = () => {
         selectedModel: model,
       }));
 
-      console.log(`Loading model: ${model.name}`);
+      if (import.meta.env.DEV) console.log(`Loading model: ${model.name}`);
 
       // 기존 세션 정리
       if (sessionRef.current) {
         try {
           await sessionRef.current.release();
         } catch (error) {
-          console.warn('Error releasing session:', error);
+          if (import.meta.env.DEV) console.warn('Error releasing session:', error);
         }
         sessionRef.current = null;
       }
@@ -50,9 +50,11 @@ const useModel = () => {
 
       sessionRef.current = session;
 
-      console.log(`Model loaded successfully: ${model.name}`);
-      console.log('Input names:', session.inputNames);
-      console.log('Output names:', session.outputNames);
+      if (import.meta.env.DEV) {
+        console.log(`Model loaded successfully: ${model.name}`);
+        console.log('Input names:', session.inputNames);
+        console.log('Output names:', session.outputNames);
+      }
 
       setState(prev => ({
         ...prev,
@@ -61,8 +63,10 @@ const useModel = () => {
         session,
       }));
     } catch (error) {
-      console.error('Model loading error:', error);
-      console.error('Failed model path:', model.file);
+      if (import.meta.env.DEV) {
+        console.error('Model loading error:', error);
+        console.error('Failed model path:', model.file);
+      }
       setState(prev => ({
         ...prev,
         isLoading: false,

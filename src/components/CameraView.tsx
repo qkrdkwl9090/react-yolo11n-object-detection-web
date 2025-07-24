@@ -26,7 +26,7 @@ const CameraView = ({
   // 비디오 스트림 연결
   useEffect(() => {
     if (videoRef.current && stream) {
-      console.log('Setting video source to stream', stream);
+      if (import.meta.env.DEV) console.log('Setting video source to stream', stream);
       videoRef.current.srcObject = stream;
     }
   }, [stream]);

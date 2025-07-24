@@ -148,9 +148,11 @@ const useInference = () => {
       const output0 = outputs.output0; // detection + mask coefficients
       const output1 = outputs.output1; // proto masks
 
-      console.log('Segmentation outputs:');
-      console.log('Output0 (detection+coeffs):', output0.dims);
-      console.log('Output1 (proto masks):', output1.dims);
+      if (import.meta.env.DEV) {
+        console.log('Segmentation outputs:');
+        console.log('Output0 (detection+coeffs):', output0.dims);
+        console.log('Output1 (proto masks):', output1.dims);
+      }
 
       const data0 = output0.data as Float32Array;
       const data1 = output1.data as Float32Array;
@@ -225,7 +227,7 @@ const useInference = () => {
         });
       }
 
-      console.log(`Segmentation results: ${results.length}`);
+      if (import.meta.env.DEV) console.log(`Segmentation results: ${results.length}`);
       return applyNMSSegmentation(results, iouThreshold);
     },
     []
@@ -246,10 +248,12 @@ const useInference = () => {
       const data = output.data as Float32Array;
       const [batchSize, numFeatures, numDetections] = output.dims;
 
-      console.log('Pose Output dims:', output.dims);
-      console.log(
-        `Processing: batch=${batchSize}, features=${numFeatures}, detections=${numDetections}`
-      );
+      if (import.meta.env.DEV) {
+        console.log('Pose Output dims:', output.dims);
+        console.log(
+          `Processing: batch=${batchSize}, features=${numFeatures}, detections=${numDetections}`
+        );
+      }
 
       const results: PoseResult[] = [];
 
@@ -311,7 +315,7 @@ const useInference = () => {
         });
       }
 
-      console.log(`Pose results: ${results.length}`);
+      if (import.meta.env.DEV) console.log(`Pose results: ${results.length}`);
       return applyNMSPose(results, iouThreshold);
     },
     []
@@ -576,7 +580,7 @@ const useInference = () => {
         tensor.dispose();
         return results;
       } catch (error) {
-        console.error('Inference error:', error);
+        if (import.meta.env.DEV) console.error('Inference error:', error);
         return [];
       }
     },
