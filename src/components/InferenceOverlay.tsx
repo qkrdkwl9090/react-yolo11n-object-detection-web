@@ -4,7 +4,7 @@ import type {
   PoseResult,
   SegmentationResult,
 } from '@/types/model';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface InferenceOverlayProps {
   results: InferenceResult[];
@@ -24,6 +24,156 @@ const InferenceOverlay = ({
   const prevResultsRef = useRef<InferenceResult[]>([]);
   const prevCanvasSizeRef = useRef({ width: 0, height: 0 });
 
+  // 색상 계산
+  const getColorForType = useCallback(
+    (type: string, classId?: number): string => {
+      if (type === 'segmentation' && classId !== undefined) {
+        const hue = (classId * 137) % 360;
+        return `hsl(${hue}, 70%, 50%)`;
+      }
+
+      switch (type) {
+        case 'detection':
+          return '#3b82f6';
+        case 'segmentation':
+          return '#10b981';
+        case 'pose':
+          return '#8b5cf6';
+        default:
+          return '#3b82f6';
+      }
+    },
+    []
+  );
+
+  // 세그멘테이션 마스크 그리기
+  const drawSegmentationMask = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      result: SegmentationResult,
+      videoElement: HTMLVideoElement
+    ) => {
+      if (!result.mask) return;
+
+      // 임시 Canvas 재사용
+      if (!tempCanvasRef.current) {
+        tempCanvasRef.current = document.createElement('canvas');
+      }
+      const tempCanvas = tempCanvasRef.current;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      tempCanvas.width = videoElement.videoWidth;
+      tempCanvas.height = videoElement.videoHeight;
+
+      tempCtx.putImageData(result.mask, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = `hsl(${(result.classId * 137) % 360}, 70%, 50%)`;
+      ctx.globalCompositeOperation = 'source-over';
+
+      ctx.drawImage(
+        tempCanvas,
+        0,
+        0,
+        videoElement.videoWidth,
+        videoElement.videoHeight,
+        0,
+        0,
+        ctx.canvas.width,
+        ctx.canvas.height
+      );
+
+      ctx.restore();
+    },
+    []
+  );
+
+  // 포즈 키포인트 및 스켈레톤 그리기
+  const drawPoseKeypoints = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      result: PoseResult,
+      scaleX: number,
+      scaleY: number
+    ) => {
+      const { keypoints } = result;
+
+      // 스켈레톤 연결선 먼저 그리기
+      ctx.lineWidth = 3;
+      POSE_SKELETON_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+        const startPoint = keypoints[startIdx - 1]; // 1-based to 0-based
+        const endPoint = keypoints[endIdx - 1];
+
+        if (!startPoint?.visible || !endPoint?.visible) return;
+        if (startPoint.confidence < 0.5 || endPoint.confidence < 0.5) return;
+
+        const startX = startPoint.x * scaleX;
+        const startY = startPoint.y * scaleY;
+        const endX = endPoint.x * scaleX;
+        const endY = endPoint.y * scaleY;
+
+        // 화면 영역 체크
+        if (
+          startX < 0 ||
+          startY < 0 ||
+          endX < 0 ||
+          endY < 0 ||
+          startX > ctx.canvas.width ||
+          startY > ctx.canvas.height ||
+          endX > ctx.canvas.width ||
+          endY > ctx.canvas.height
+        ) {
+          return;
+        }
+
+        // 연결선 색상
+        const avgIdx = Math.floor((startIdx + endIdx) / 2);
+        ctx.strokeStyle = POSE_COLORS[avgIdx % POSE_COLORS.length];
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      });
+
+      // 키포인트 그리기
+      keypoints.forEach((keypoint, idx) => {
+        if (!keypoint.visible || keypoint.confidence < 0.5) return;
+
+        const x = keypoint.x * scaleX;
+        const y = keypoint.y * scaleY;
+
+        // 화면 영역 체크
+        if (x < 0 || y < 0 || x > ctx.canvas.width || y > ctx.canvas.height) {
+          return;
+        }
+
+        // 키포인트 원
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = POSE_COLORS[idx % POSE_COLORS.length];
+        ctx.fill();
+
+        // 테두리
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 신뢰도가 높은 키포인트에 인덱스 표시 (선택사항)
+        if (keypoint.confidence > 0.8) {
+          ctx.fillStyle = 'white';
+          ctx.font = '10px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(idx.toString(), x, y + 3);
+          ctx.textAlign = 'start'; // 기본값으로 복원
+        }
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     if (!canvasRef.current || !videoElement) return;
 
@@ -34,10 +184,10 @@ const InferenceOverlay = ({
     const rect = videoElement.getBoundingClientRect();
     const newWidth = rect.width;
     const newHeight = rect.height;
-    
+
     // Canvas 크기가 변경되었을 때만 업데이트
-    const sizeChanged = 
-      canvas.width !== newWidth || 
+    const sizeChanged =
+      canvas.width !== newWidth ||
       canvas.height !== newHeight ||
       prevCanvasSizeRef.current.width !== newWidth ||
       prevCanvasSizeRef.current.height !== newHeight;
@@ -60,11 +210,11 @@ const InferenceOverlay = ({
           const scaledY1 = y1 * scaleY;
           const scaledX2 = x2 * scaleX;
           const scaledY2 = y2 * scaleY;
-          
+
           // 여백을 포함하여 클리어 (라벨 영역 포함)
           ctx.clearRect(
-            Math.max(0, scaledX1 - 50), 
-            Math.max(0, scaledY1 - 30), 
+            Math.max(0, scaledX1 - 50),
+            Math.max(0, scaledY1 - 30),
             Math.min(canvas.width, scaledX2 - scaledX1 + 100),
             Math.min(canvas.height, scaledY2 - scaledY1 + 60)
           );
@@ -125,150 +275,17 @@ const InferenceOverlay = ({
       ctx.fillStyle = 'white';
       ctx.fillText(text, labelX + 4, labelY + textHeight - 2);
     });
-    
+
     // 현재 결과를 다음 프레임을 위해 저장
     prevResultsRef.current = [...results];
-  }, [results, videoElement, modelType]);
-
-  // 세그멘테이션 마스크 그리기
-  const drawSegmentationMask = (
-    ctx: CanvasRenderingContext2D,
-    result: SegmentationResult,
-    videoElement: HTMLVideoElement
-  ) => {
-    if (!result.mask) return;
-
-    // 임시 Canvas 재사용
-    if (!tempCanvasRef.current) {
-      tempCanvasRef.current = document.createElement('canvas');
-    }
-    const tempCanvas = tempCanvasRef.current;
-    const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
-    
-    tempCanvas.width = videoElement.videoWidth;
-    tempCanvas.height = videoElement.videoHeight;
-
-    tempCtx.putImageData(result.mask, 0, 0);
-
-    ctx.save();
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = `hsl(${(result.classId * 137) % 360}, 70%, 50%)`;
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.drawImage(
-      tempCanvas,
-      0,
-      0,
-      videoElement.videoWidth,
-      videoElement.videoHeight,
-      0,
-      0,
-      ctx.canvas.width,
-      ctx.canvas.height
-    );
-
-    ctx.restore();
-  };
-
-  // 포즈 키포인트 및 스켈레톤 그리기
-  const drawPoseKeypoints = (
-    ctx: CanvasRenderingContext2D,
-    result: PoseResult,
-    scaleX: number,
-    scaleY: number
-  ) => {
-    const { keypoints } = result;
-
-    // 스켈레톤 연결선 먼저 그리기
-    ctx.lineWidth = 3;
-    POSE_SKELETON_CONNECTIONS.forEach(([startIdx, endIdx]) => {
-      const startPoint = keypoints[startIdx - 1]; // 1-based to 0-based
-      const endPoint = keypoints[endIdx - 1];
-
-      if (!startPoint?.visible || !endPoint?.visible) return;
-      if (startPoint.confidence < 0.5 || endPoint.confidence < 0.5) return;
-
-      const startX = startPoint.x * scaleX;
-      const startY = startPoint.y * scaleY;
-      const endX = endPoint.x * scaleX;
-      const endY = endPoint.y * scaleY;
-
-      // 화면 영역 체크
-      if (
-        startX < 0 ||
-        startY < 0 ||
-        endX < 0 ||
-        endY < 0 ||
-        startX > ctx.canvas.width ||
-        startY > ctx.canvas.height ||
-        endX > ctx.canvas.width ||
-        endY > ctx.canvas.height
-      ) {
-        return;
-      }
-
-      // 연결선 색상
-      const avgIdx = Math.floor((startIdx + endIdx) / 2);
-      ctx.strokeStyle = POSE_COLORS[avgIdx % POSE_COLORS.length];
-
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-    });
-
-    // 키포인트 그리기
-    keypoints.forEach((keypoint, idx) => {
-      if (!keypoint.visible || keypoint.confidence < 0.5) return;
-
-      const x = keypoint.x * scaleX;
-      const y = keypoint.y * scaleY;
-
-      // 화면 영역 체크
-      if (x < 0 || y < 0 || x > ctx.canvas.width || y > ctx.canvas.height) {
-        return;
-      }
-
-      // 키포인트 원
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = POSE_COLORS[idx % POSE_COLORS.length];
-      ctx.fill();
-
-      // 테두리
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // 신뢰도가 높은 키포인트에 인덱스 표시 (선택사항)
-      if (keypoint.confidence > 0.8) {
-        ctx.fillStyle = 'white';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(idx.toString(), x, y + 3);
-        ctx.textAlign = 'start'; // 기본값으로 복원
-      }
-    });
-  };
-
-  const getColorForType = (type: string, classId?: number): string => {
-    if (type === 'segmentation' && classId !== undefined) {
-      const hue = (classId * 137) % 360;
-      return `hsl(${hue}, 70%, 50%)`;
-    }
-
-    switch (type) {
-      case 'detection':
-        return '#3b82f6';
-      case 'segmentation':
-        return '#10b981';
-      case 'pose':
-        return '#8b5cf6';
-      default:
-        return '#3b82f6';
-    }
-  };
+  }, [
+    results,
+    videoElement,
+    modelType,
+    drawSegmentationMask,
+    drawPoseKeypoints,
+    getColorForType,
+  ]);
 
   return (
     <canvas
