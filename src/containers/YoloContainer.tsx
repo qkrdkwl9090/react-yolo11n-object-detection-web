@@ -6,7 +6,7 @@ import useInference from '@/hooks/useInference';
 import useModel from '@/hooks/useModel';
 import { cn } from '@/lib/utils';
 import type { InferenceResult, ModelInfo } from '@/types/model';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const YoloContainer = () => {
   const [results, setResults] = useState<InferenceResult[]>([]);
@@ -19,6 +19,22 @@ const YoloContainer = () => {
   const camera = useCamera();
   const model = useModel();
   const { runInference } = useInference();
+
+  // 결과 통계 계산
+  const resultStats = useMemo(() => {
+    if (results.length === 0) return [];
+
+    const classNameCounts = new Map<string, number>();
+    results.forEach(result => {
+      const count = classNameCounts.get(result.className) || 0;
+      classNameCounts.set(result.className, count + 1);
+    });
+
+    return Array.from(classNameCounts.entries()).map(([className, count]) => ({
+      className,
+      count,
+    }));
+  }, [results]);
 
   // 추론 정리
   const cleanupInference = useCallback(() => {
@@ -42,11 +58,13 @@ const YoloContainer = () => {
       !videoRef.current ||
       !model.selectedModel
     ) {
-      if (import.meta.env.DEV) console.log('Cannot start inference: missing requirements');
+      if (import.meta.env.DEV)
+        console.log('Cannot start inference: missing requirements');
       return;
     }
 
-    if (import.meta.env.DEV) console.log('Starting inference with model:', model.selectedModel.name);
+    if (import.meta.env.DEV)
+      console.log('Starting inference with model:', model.selectedModel.name);
     isRunningRef.current = true;
     isProcessingRef.current = false;
     setIsRunning(true);
@@ -141,7 +159,8 @@ const YoloContainer = () => {
 
   // 모델 선택 핸들러 - 완전한 상태 리셋
   const handleModelSelect = async (modelInfo: ModelInfo) => {
-    if (import.meta.env.DEV) console.log('Model selection started:', modelInfo.name);
+    if (import.meta.env.DEV)
+      console.log('Model selection started:', modelInfo.name);
 
     // 1. 즉시 추론 정리
     cleanupInference();
@@ -152,7 +171,8 @@ const YoloContainer = () => {
     // 3. 모델 로드
     try {
       await model.loadModel(modelInfo);
-      if (import.meta.env.DEV) console.log('Model loaded successfully:', modelInfo.name);
+      if (import.meta.env.DEV)
+        console.log('Model loaded successfully:', modelInfo.name);
     } catch (error) {
       console.error('Model loading failed:', error);
     }
@@ -161,7 +181,8 @@ const YoloContainer = () => {
   // 추론 토글 핸들러
   const toggleDetection = () => {
     if (!model.isLoaded || !camera.stream) {
-      if (import.meta.env.DEV) console.log('Cannot toggle: model not loaded or camera not available');
+      if (import.meta.env.DEV)
+        console.log('Cannot toggle: model not loaded or camera not available');
       return;
     }
 
@@ -177,7 +198,8 @@ const YoloContainer = () => {
   // 모델이 변경될 때 추론 정리
   useEffect(() => {
     if (model.selectedModel) {
-      if (import.meta.env.DEV) console.log('Model changed, cleaning up previous inference');
+      if (import.meta.env.DEV)
+        console.log('Model changed, cleaning up previous inference');
       cleanupInference();
     }
   }, [model.selectedModel, cleanupInference]);
@@ -279,27 +301,20 @@ const YoloContainer = () => {
         </div>
 
         {/* 결과 통계 */}
-        {results.length > 0 && (
+        {resultStats.length > 0 && (
           <div className='mt-4 rounded-lg bg-gray-800 p-4'>
             <h3 className='mb-2 text-sm font-medium text-gray-300'>
               Detected Objects ({model.selectedModel?.type}):
             </h3>
             <div className='flex flex-wrap gap-2'>
-              {Array.from(new Set(results.map(r => r.className))).map(
-                className => {
-                  const count = results.filter(
-                    r => r.className === className
-                  ).length;
-                  return (
-                    <span
-                      key={className}
-                      className='text-primary-300 rounded bg-primary-500/20 px-2 py-1 text-sm'
-                    >
-                      {className}: {count}
-                    </span>
-                  );
-                }
-              )}
+              {resultStats.map(({ className, count }) => (
+                <span
+                  key={className}
+                  className='text-primary-300 rounded bg-primary-500/20 px-2 py-1 text-sm'
+                >
+                  {className}: {count}
+                </span>
+              ))}
             </div>
           </div>
         )}

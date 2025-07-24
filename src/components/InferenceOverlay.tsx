@@ -23,6 +23,7 @@ const InferenceOverlay = ({
   const tempCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const prevResultsRef = useRef<InferenceResult[]>([]);
   const prevCanvasSizeRef = useRef({ width: 0, height: 0 });
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   // 색상 계산
   const getColorForType = useCallback(
@@ -174,6 +175,57 @@ const InferenceOverlay = ({
     []
   );
 
+  // Canvas 크기 업데이트 함수 메모이제이션
+  const updateCanvasSize = useCallback(() => {
+    if (!canvasRef.current || !videoElement) return;
+
+    const canvas = canvasRef.current;
+    const rect = videoElement.getBoundingClientRect();
+    const newWidth = rect.width;
+    const newHeight = rect.height;
+    
+    // 크기가 실제로 변경되었을 때만 업데이트
+    if (
+      canvas.width !== newWidth || 
+      canvas.height !== newHeight ||
+      prevCanvasSizeRef.current.width !== newWidth ||
+      prevCanvasSizeRef.current.height !== newHeight
+    ) {
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+      
+      // 크기 변경 시 전체 클리어
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }, [videoElement]);
+
+  // ResizeObserver 설정
+  useEffect(() => {
+    if (!videoElement) return;
+
+    // 초기 크기 설정
+    updateCanvasSize();
+
+    // ResizeObserver 생성
+    resizeObserverRef.current = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+
+    // 비디오 요소 관찰 시작
+    resizeObserverRef.current.observe(videoElement);
+
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
+    };
+  }, [videoElement, updateCanvasSize]);
+
   useEffect(() => {
     if (!canvasRef.current || !videoElement) return;
 
@@ -181,49 +233,36 @@ const InferenceOverlay = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = videoElement.getBoundingClientRect();
-    const newWidth = rect.width;
-    const newHeight = rect.height;
+    // 현재 Canvas 크기 사용 (ResizeObserver가 관리함)
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    
+    if (canvasWidth === 0 || canvasHeight === 0) return;
 
-    // Canvas 크기가 변경되었을 때만 업데이트
-    const sizeChanged =
-      canvas.width !== newWidth ||
-      canvas.height !== newHeight ||
-      prevCanvasSizeRef.current.width !== newWidth ||
-      prevCanvasSizeRef.current.height !== newHeight;
-
-    if (sizeChanged) {
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-      prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    } else {
-      // 크기가 같으면 이전 결과와 비교하여 변화된 영역만 클리어
-      const prevResults = prevResultsRef.current;
-      if (prevResults.length > 0 || results.length > 0) {
-        // 이전 결과 영역들을 클리어
-        prevResults.forEach(result => {
-          const [x1, y1, x2, y2] = result.bbox;
-          const scaleX = newWidth / videoElement.videoWidth;
-          const scaleY = newHeight / videoElement.videoHeight;
-          const scaledX1 = x1 * scaleX;
-          const scaledY1 = y1 * scaleY;
-          const scaledX2 = x2 * scaleX;
-          const scaledY2 = y2 * scaleY;
-
-          // 여백을 포함하여 클리어 (라벨 영역 포함)
-          ctx.clearRect(
-            Math.max(0, scaledX1 - 50),
-            Math.max(0, scaledY1 - 30),
-            Math.min(canvas.width, scaledX2 - scaledX1 + 100),
-            Math.min(canvas.height, scaledY2 - scaledY1 + 60)
-          );
-        });
-      }
+    // 이전 결과 영역들을 클리어 (크기 변경이 아닌 경우)
+    const prevResults = prevResultsRef.current;
+    if (prevResults.length > 0) {
+      prevResults.forEach(result => {
+        const [x1, y1, x2, y2] = result.bbox;
+        const scaleX = canvasWidth / videoElement.videoWidth;
+        const scaleY = canvasHeight / videoElement.videoHeight;
+        const scaledX1 = x1 * scaleX;
+        const scaledY1 = y1 * scaleY;
+        const scaledX2 = x2 * scaleX;
+        const scaledY2 = y2 * scaleY;
+        
+        // 여백을 포함하여 클리어 (라벨 영역 포함)
+        ctx.clearRect(
+          Math.max(0, scaledX1 - 50), 
+          Math.max(0, scaledY1 - 30), 
+          Math.min(canvasWidth, scaledX2 - scaledX1 + 100),
+          Math.min(canvasHeight, scaledY2 - scaledY1 + 60)
+        );
+      });
     }
 
-    const scaleX = newWidth / videoElement.videoWidth;
-    const scaleY = newHeight / videoElement.videoHeight;
+    const scaleX = canvasWidth / videoElement.videoWidth;
+    const scaleY = canvasHeight / videoElement.videoHeight;
 
     results.forEach(result => {
       const [x1, y1, x2, y2] = result.bbox;
