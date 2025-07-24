@@ -11,6 +11,8 @@ import { useCallback, useRef } from 'react';
 
 const useInference = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const tempCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const preprocessImage = useCallback(
     (
@@ -349,16 +351,22 @@ const useInference = () => {
         }
       }
 
-      // 마스크를 원본 크기로 리사이즈
-      const canvas = document.createElement('canvas');
+      // 마스크를 원본 크기로 리사이즈 - Canvas 재사용
+      if (!maskCanvasRef.current) {
+        maskCanvasRef.current = document.createElement('canvas');
+      }
+      const canvas = maskCanvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
       canvas.width = originalWidth;
       canvas.height = originalHeight;
 
-      // 임시 캔버스에 proto 크기로 마스크 그리기
-      const tempCanvas = document.createElement('canvas');
+      // 임시 캔버스에 proto 크기로 마스크 그리기 - Canvas 재사용
+      if (!tempCanvasRef.current) {
+        tempCanvasRef.current = document.createElement('canvas');
+      }
+      const tempCanvas = tempCanvasRef.current;
       const tempCtx = tempCanvas.getContext('2d');
       if (!tempCtx) return null;
       tempCanvas.width = protoWidth;

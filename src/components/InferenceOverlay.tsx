@@ -20,6 +20,9 @@ const InferenceOverlay = ({
   className,
 }: InferenceOverlayProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tempCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const prevResultsRef = useRef<InferenceResult[]>([]);
+  const prevCanvasSizeRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!canvasRef.current || !videoElement) return;
@@ -29,13 +32,48 @@ const InferenceOverlay = ({
     if (!ctx) return;
 
     const rect = videoElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    const newWidth = rect.width;
+    const newHeight = rect.height;
+    
+    // Canvas 크기가 변경되었을 때만 업데이트
+    const sizeChanged = 
+      canvas.width !== newWidth || 
+      canvas.height !== newHeight ||
+      prevCanvasSizeRef.current.width !== newWidth ||
+      prevCanvasSizeRef.current.height !== newHeight;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (sizeChanged) {
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+      prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      // 크기가 같으면 이전 결과와 비교하여 변화된 영역만 클리어
+      const prevResults = prevResultsRef.current;
+      if (prevResults.length > 0 || results.length > 0) {
+        // 이전 결과 영역들을 클리어
+        prevResults.forEach(result => {
+          const [x1, y1, x2, y2] = result.bbox;
+          const scaleX = newWidth / videoElement.videoWidth;
+          const scaleY = newHeight / videoElement.videoHeight;
+          const scaledX1 = x1 * scaleX;
+          const scaledY1 = y1 * scaleY;
+          const scaledX2 = x2 * scaleX;
+          const scaledY2 = y2 * scaleY;
+          
+          // 여백을 포함하여 클리어 (라벨 영역 포함)
+          ctx.clearRect(
+            Math.max(0, scaledX1 - 50), 
+            Math.max(0, scaledY1 - 30), 
+            Math.min(canvas.width, scaledX2 - scaledX1 + 100),
+            Math.min(canvas.height, scaledY2 - scaledY1 + 60)
+          );
+        });
+      }
+    }
 
-    const scaleX = rect.width / videoElement.videoWidth;
-    const scaleY = rect.height / videoElement.videoHeight;
+    const scaleX = newWidth / videoElement.videoWidth;
+    const scaleY = newHeight / videoElement.videoHeight;
 
     results.forEach(result => {
       const [x1, y1, x2, y2] = result.bbox;
@@ -87,6 +125,9 @@ const InferenceOverlay = ({
       ctx.fillStyle = 'white';
       ctx.fillText(text, labelX + 4, labelY + textHeight - 2);
     });
+    
+    // 현재 결과를 다음 프레임을 위해 저장
+    prevResultsRef.current = [...results];
   }, [results, videoElement, modelType]);
 
   // 세그멘테이션 마스크 그리기
@@ -97,8 +138,14 @@ const InferenceOverlay = ({
   ) => {
     if (!result.mask) return;
 
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d')!;
+    // 임시 Canvas 재사용
+    if (!tempCanvasRef.current) {
+      tempCanvasRef.current = document.createElement('canvas');
+    }
+    const tempCanvas = tempCanvasRef.current;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+    
     tempCanvas.width = videoElement.videoWidth;
     tempCanvas.height = videoElement.videoHeight;
 
